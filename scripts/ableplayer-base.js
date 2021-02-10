@@ -64,6 +64,10 @@ var AblePlayerInstances = [];
 	// Parameters are:
 	// media - jQuery selector or element identifying the media.
 	window.AblePlayer = function(media) {
+
+
+  	var thisObj = this;
+
 		// Keep track of the last player created for use with global events.
 		AblePlayer.lastCreated = this;
 		this.media = media;
@@ -400,23 +404,16 @@ var AblePlayerInstances = [];
 		}
 
 		// Language
-		this.lang = 'en';
-		if ($(media).data('lang') !== undefined && $(media).data('lang') !== "") {
-			var lang = $(media).data('lang');
-			if (lang.length == 2) {
-				this.lang = lang;
-			}
-		}
-		// Player language is determined as follows (in translation.js > getTranslationText() ):
-		// 1. Lang attributes on <html> or <body>, if a matching translation file is available
-		// 2. The value of this.lang, if a matching translation file is available
+		// Player language is determined given the following precedence:
+    // 1. The value of data-lang on the media element, if provided and a matching translation file is available
+		// 2. Lang attribute on <html> or <body>, if a matching translation file is available
 		// 3. English
-		// To override this formula and force #2 to take precedence over #1, set data-force-lang="true"
-		if ($(media).data('force-lang') !== undefined && $(media).data('force-lang') !== false) {
-			this.forceLang = true;
+		// Final calculation occurs in translation.js > getTranslationText()
+		if ($(media).data('lang') !== undefined && $(media).data('lang') !== "") {
+		  this.lang = $(media).data('lang').toLowerCase();
 		}
 		else {
-			this.forceLang = false;
+  		this.lang = null;
 		}
 
 		// Metadata Tracks
@@ -429,12 +426,15 @@ var AblePlayerInstances = [];
 		}
 
 		// Search
-		if ($(media).data('search') !== undefined && $(media).data('search') !== "") {
-			// conducting a search currently requires an external div in which to write the results
-			if ($(media).data('search-div') !== undefined && $(media).data('search-div') !== "") {
+		// conducting a search requires an external div in which to write the results
+		if ($(media).data('search-div') !== undefined && $(media).data('search-div') !== "") {
+
+      this.searchDiv = $(media).data('search-div');
+
+      // Search term (optional; could be assigned later in a JavaScript application)
+      if ($(media).data('search') !== undefined && $(media).data('search') !== "") {
 				this.searchString = $(media).data('search');
-				this.searchDiv = $(media).data('search-div');
-			}
+      }
 
 			// Search Language
 			if ($(media).data('search-lang') !== undefined && $(media).data('search-lang') !== "") {
@@ -468,9 +468,25 @@ var AblePlayerInstances = [];
 		// so users can control the player while transcribing
 		if ($(media).data('steno-mode') !== undefined && $(media).data('steno-mode') !== false) {
 			this.stenoMode = true;
+			// Add support for stenography in an iframe via data-steno-iframe-id
+      if ($(media).data('steno-iframe-id') !== undefined && $(media).data('steno-iframe-id') !== "") {
+			  this.stenoFrameId = $(media).data('steno-iframe-id');
+        this.$stenoFrame = $('#' + this.stenoFrameId);
+        if (!(this.$stenoFrame.length)) {
+          // iframe not found
+          this.stenoFrameId = null;
+          this.$stenoFrame = null;
+        }
+      }
+      else {
+        this.stenoFrameId = null;
+        this.$stenoFrame = null;
+      }
 		}
 		else {
 			this.stenoMode = false;
+      this.stenoFrameId = null;
+      this.$stenoFrame = null;
 		}
 
 		// Define built-in variables that CANNOT be overridden with HTML attributes
@@ -554,8 +570,6 @@ var AblePlayerInstances = [];
 			return $(document.getElementById(id));
 		}
 	};
-
-
 
 	AblePlayer.youtubeIframeAPIReady = false;
 	AblePlayer.loadingYoutubeIframeAPI = false;

@@ -318,16 +318,13 @@
 		$thisElement = $(document.activeElement);
 
     if (which === 27) { // escape
-console.log('onPlayerKeyPress, you pressed Escape');
       if ($.contains(this.$transcriptArea[0],$thisElement[0])) {
-console.log('element is part of the transcript area');
         // This element is part of transcript area.
         this.handleTranscriptToggle();
         return false;
       }
     }
 		if (!this.okToHandleKeyPress()) {
-console.log('NOT ok!');
 			return false;
 		}
 
@@ -344,7 +341,6 @@ console.log('NOT ok!');
 			e.target.tagName === 'SELECT'
 		)){
 			if (which === 27) { // escape
-console.log('You pushed ESC');
 				this.closePopups();
 			}
 			else if (which === 32) { // spacebar = play/pause
@@ -882,7 +878,6 @@ console.log('You pushed ESC');
 
 		// if user presses a key from anywhere on the page, show player controls
 		$(document).keydown(function(e) {
-
 			if (thisObj.controlsHidden) {
 				thisObj.fadeControls('in');
 				thisObj.controlsHidden = false;
@@ -912,11 +907,17 @@ console.log('You pushed ESC');
 		// handle local keydown events if this isn't the only player on the page;
 		// otherwise these are dispatched by global handler (see ableplayer-base,js)
 		this.$ableDiv.keydown(function (e) {
-
 			if (AblePlayer.nextIndex > 1) {
 				thisObj.onPlayerKeyPress(e);
 			}
 		});
+
+		// If stenoMode is enabled in an iframe, handle keydown events from the iframe
+    if (this.stenoMode && (typeof this.stenoFrameContents !== 'undefined')) {
+      this.stenoFrameContents.on('keydown',function(e) {
+        thisObj.onPlayerKeyPress(e);
+      });
+    };
 
 		// transcript is not a child of this.$ableDiv
 		// therefore, must be added separately

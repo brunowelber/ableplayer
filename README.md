@@ -31,7 +31,9 @@ Supported Languages
 Able Player has been translated into the following languages. To add another language, see instructions below under **Contributing**.
 
 <ul>
+  <li><strong lang="id">Bahasa Indonesia</strong> (Indonesian)</li>
   <li><strong lang="ca">Català</strong> (Catalan)</li>
+  <li><strong lang="cs">čeština</strong> (Czech)</li>
   <li><strong lang="zh-tw">Chinese, Traditional (Taiwan)</strong></li>    
   <li><strong lang="de">Deutsch</strong> (German)</li>
   <li><strong>English</strong></li> 
@@ -42,6 +44,7 @@ Able Player has been translated into the following languages. To add another lan
   <li><strong lang="ja">日本語</strong> (Japanese)</li>  
   <li><strong lang="nb">Norsk Bokmål</strong> (Norwegian)</li> 
   <li><strong lang="nl">Nederlands, Vlaams</strong> (Dutch)</li> 
+  <li><strong lang="sv">Svenska</strong> (Swedish)</li> 
   <li><strong lang="tr">Türkçe</strong> (Turkish)</li>
 </ul>
 
@@ -214,6 +217,7 @@ The following attributes are supported on both the `<audio>` and `<video>` eleme
 -   **data-skin** - optional; "legacy (default) or "2020". The default skin has two rows of controls, with the seekbar positioned in available space within the top row. The "2020" skin, introduced in version 4.2, has all buttons in one row beneath a full-width seekbar. 
 -   **data-speed-icons** - optional; "animals" (default) or "arrows". The default setting uses a turtle icon for *slower* and a rabbit icon for *faster*. Setting this to "arrows" uses the original Able Player icons (prior to version 3.5), arrows pointing up for *faster* and down for *slower*.
 -   **data-start-time** - optional; time at which you want the audio to start playing (in seconds)
+-   **data-steno-iframe-id** - optional; id of an iframe in which users will be typing with steno-mode enabled (see next item).
 -   **data-steno-mode** - optional; "true" to allow keyboard shortcuts for controlling the player remotely within textarea form fields, e.g., for transcribing media content. 
 -   **data-volume** - optional; set the default volume (0 to 10; default is 7 to avoid overpowering screen reader audio)
 -   **data-seek-interval** - optional; interval (in seconds) of forward and rewind buttons. By default, seek interval is intelligently calculated based on  duration of the media.
@@ -221,8 +225,7 @@ The following attributes are supported on both the `<audio>` and `<video>` eleme
 
 #### Language
 
--   **data-lang** - optional; specify language of the player using 2-character language code (default is "en" for English)
--   **data-force-lang** - optional; include this option to force the player to use the value of *data-lang* as the player language. Otherwise, the player language will be set as follows, in order of precedence: 1) the language of the web page or user's web browser if either is known and if there is a matching translation file; 2) the value of *data-lang* if provided; 3) English.
+-   **data-lang** - optional; specify language of the player using 2-character language code. In order to work, the language specified must be one of Able Player's supported languages (see **Supported Languages** above). If **data-lang** is not included or specifies a language that is not supported, Able Player will default to the language of the web page if known and supported; otherwise it will default to English.   
 
 #### Captions
 
@@ -722,7 +725,13 @@ are ultimately combined into several different files (in the */build* directory)
 [npm][] and [Grunt][]:
 
 ```sh
+# Install Grunt globally 
+npm install -g grunt-cli
+
+# Install project dependencies
 npm install
+
+# Build CSS and JS
 grunt
 ```
 

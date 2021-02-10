@@ -64,6 +64,10 @@ var AblePlayerInstances = [];
 	// Parameters are:
 	// media - jQuery selector or element identifying the media.
 	window.AblePlayer = function(media) {
+
+
+  	var thisObj = this;
+
 		// Keep track of the last player created for use with global events.
 		AblePlayer.lastCreated = this;
 		this.media = media;
@@ -400,23 +404,16 @@ var AblePlayerInstances = [];
 		}
 
 		// Language
-		this.lang = 'en';
-		if ($(media).data('lang') !== undefined && $(media).data('lang') !== "") {
-			var lang = $(media).data('lang');
-			if (lang.length == 2) {
-				this.lang = lang;
-			}
-		}
-		// Player language is determined as follows (in translation.js > getTranslationText() ):
-		// 1. Lang attributes on <html> or <body>, if a matching translation file is available
-		// 2. The value of this.lang, if a matching translation file is available
+		// Player language is determined given the following precedence:
+    // 1. The value of data-lang on the media element, if provided and a matching translation file is available
+		// 2. Lang attribute on <html> or <body>, if a matching translation file is available
 		// 3. English
-		// To override this formula and force #2 to take precedence over #1, set data-force-lang="true"
-		if ($(media).data('force-lang') !== undefined && $(media).data('force-lang') !== false) {
-			this.forceLang = true;
+		// Final calculation occurs in translation.js > getTranslationText()
+		if ($(media).data('lang') !== undefined && $(media).data('lang') !== "") {
+		  this.lang = $(media).data('lang').toLowerCase();
 		}
 		else {
-			this.forceLang = false;
+  		this.lang = null;
 		}
 
 		// Metadata Tracks
@@ -429,12 +426,15 @@ var AblePlayerInstances = [];
 		}
 
 		// Search
-		if ($(media).data('search') !== undefined && $(media).data('search') !== "") {
-			// conducting a search currently requires an external div in which to write the results
-			if ($(media).data('search-div') !== undefined && $(media).data('search-div') !== "") {
+		// conducting a search requires an external div in which to write the results
+		if ($(media).data('search-div') !== undefined && $(media).data('search-div') !== "") {
+
+      this.searchDiv = $(media).data('search-div');
+
+      // Search term (optional; could be assigned later in a JavaScript application)
+      if ($(media).data('search') !== undefined && $(media).data('search') !== "") {
 				this.searchString = $(media).data('search');
-				this.searchDiv = $(media).data('search-div');
-			}
+      }
 
 			// Search Language
 			if ($(media).data('search-lang') !== undefined && $(media).data('search-lang') !== "") {
@@ -468,9 +468,25 @@ var AblePlayerInstances = [];
 		// so users can control the player while transcribing
 		if ($(media).data('steno-mode') !== undefined && $(media).data('steno-mode') !== false) {
 			this.stenoMode = true;
+			// Add support for stenography in an iframe via data-steno-iframe-id
+      if ($(media).data('steno-iframe-id') !== undefined && $(media).data('steno-iframe-id') !== "") {
+			  this.stenoFrameId = $(media).data('steno-iframe-id');
+        this.$stenoFrame = $('#' + this.stenoFrameId);
+        if (!(this.$stenoFrame.length)) {
+          // iframe not found
+          this.stenoFrameId = null;
+          this.$stenoFrame = null;
+        }
+      }
+      else {
+        this.stenoFrameId = null;
+        this.$stenoFrame = null;
+      }
 		}
 		else {
 			this.stenoMode = false;
+      this.stenoFrameId = null;
+      this.$stenoFrame = null;
 		}
 
 		// Define built-in variables that CANNOT be overridden with HTML attributes
@@ -554,8 +570,6 @@ var AblePlayerInstances = [];
 			return $(document.getElementById(id));
 		}
 	};
-
-
 
 	AblePlayer.youtubeIframeAPIReady = false;
 	AblePlayer.loadingYoutubeIframeAPI = false;
@@ -1134,72 +1148,80 @@ var AblePlayerInstances = [];
 
 					thisObj.setupTranscript().then(function() {
 
-            thisObj.getMediaTimes().then(function(mediaTimes) {
+        		thisObj.initStenoFrame().then(function() {
 
-              thisObj.duration = mediaTimes['duration'];
-              thisObj.elapsed = mediaTimes['elapsed'];
+              if (thisObj.stenoMode && thisObj.$stenoFrame) {
+                thisObj.stenoFrameContents = thisObj.$stenoFrame.contents();
+			        }
 
-              thisObj.setFullscreen(false);
+              thisObj.getMediaTimes().then(function(mediaTimes) {
 
-              if (typeof thisObj.volume === 'undefined') {
-  						  thisObj.volume = thisObj.defaultVolume;
-						  }
-						  if (thisObj.volume) {
-                thisObj.setVolume(thisObj.volume);
-              }
+                thisObj.duration = mediaTimes['duration'];
+                thisObj.elapsed = mediaTimes['elapsed'];
 
-              if (thisObj.transcriptType) {
-							  thisObj.addTranscriptAreaEvents();
-                thisObj.updateTranscript();
-						  }
-              if (thisObj.mediaType === 'video') {
-							  thisObj.initDescription();
-						  }
-              if (thisObj.captions.length) {
-							  thisObj.initDefaultCaption();
-						  }
+                thisObj.setFullscreen(false);
 
-              // setMediaAttributes() sets textTrack.mode to 'disabled' for all tracks
-              // This tells browsers to ignore the text tracks so Able Player can handle them
-              // However, timing is critical as browsers - especially Safari - tend to ignore this request
-              // unless it's sent late in the intialization process.
-              // If browsers ignore the request, the result is redundant captions
-              thisObj.setMediaAttributes();
-              thisObj.addControls();
-              thisObj.addEventListeners();
+                if (typeof thisObj.volume === 'undefined') {
+  						    thisObj.volume = thisObj.defaultVolume;
+						    }
+                if (thisObj.volume) {
+                  thisObj.setVolume(thisObj.volume);
+                }
 
-              // inject each of the hidden forms that will be accessed from the Preferences popup menu
-              prefsGroups = thisObj.getPreferencesGroups();
-              for (i = 0; i < prefsGroups.length; i++) {
-							  thisObj.injectPrefsForm(prefsGroups[i]);
-				      }
-              thisObj.setupPopups();
-              thisObj.updateCaption();
-              thisObj.injectVTS();
-              if (thisObj.chaptersDivLocation) {
-							  thisObj.populateChaptersDiv();
-				      }
-              thisObj.showSearchResults();
+                if (thisObj.transcriptType) {
+							    thisObj.addTranscriptAreaEvents();
+                  thisObj.updateTranscript();
+						    }
+                if (thisObj.mediaType === 'video') {
+							    thisObj.initDescription();
+						    }
+                if (thisObj.captions.length) {
+							    thisObj.initDefaultCaption();
+						    }
 
-              // Go ahead and load media, without user requesting it
-              // Ideally, we would wait until user clicks play, rather than unnecessarily consume their bandwidth
-              // However, the media needs to load before the 'loadedmetadata' event is fired
-              // and until that happens we can't get the media's duration
-              if (thisObj.player === 'html5') {
-							  thisObj.$media[0].load();
-						  }
-              // refreshControls is called twice building/initializing the player
-              // this is the second. Best to pause a bit before executing, to be sure all prior steps are complete
-              setTimeout(function() {
-							  thisObj.refreshControls('init');
-						  },100);
-            });
-					},
-					function() {	 // initPlayer fail
-						thisObj.provideFallback();
-					});
-				});
-			});
+                // setMediaAttributes() sets textTrack.mode to 'disabled' for all tracks
+                // This tells browsers to ignore the text tracks so Able Player can handle them
+                // However, timing is critical as browsers - especially Safari - tend to ignore this request
+                // unless it's sent late in the intialization process.
+                // If browsers ignore the request, the result is redundant captions
+                thisObj.setMediaAttributes();
+                thisObj.addControls();
+
+                thisObj.addEventListeners();
+
+                // inject each of the hidden forms that will be accessed from the Preferences popup menu
+                prefsGroups = thisObj.getPreferencesGroups();
+                for (i = 0; i < prefsGroups.length; i++) {
+							    thisObj.injectPrefsForm(prefsGroups[i]);
+				        }
+                thisObj.setupPopups();
+                thisObj.updateCaption();
+                thisObj.injectVTS();
+                if (thisObj.chaptersDivLocation) {
+							    thisObj.populateChaptersDiv();
+				        }
+                thisObj.showSearchResults();
+
+                // Go ahead and load media, without user requesting it
+                // Ideally, we would wait until user clicks play, rather than unnecessarily consume their bandwidth
+                // However, the media needs to load before the 'loadedmetadata' event is fired
+                // and until that happens we can't get the media's duration
+                if (thisObj.player === 'html5') {
+							    thisObj.$media[0].load();
+						    }
+                // refreshControls is called twice building/initializing the player
+                // this is the second. Best to pause a bit before executing, to be sure all prior steps are complete
+                setTimeout(function() {
+							    thisObj.refreshControls('init');
+						    },100);
+              }); // end getMediaTimes
+					  }); // end initStenoFrame
+          }); // end setupTranscript
+        }); // end setupAltCaptions
+      }); // end setupTracks
+    },
+    function() {	 // initPlayer fail
+		  thisObj.provideFallback();
 		});
 	};
 
@@ -1241,6 +1263,34 @@ var AblePlayerInstances = [];
 			}
 		);
 
+		return promise;
+	};
+
+	AblePlayer.prototype.initStenoFrame = function() {
+
+		var thisObj, deferred, promise, $iframe;
+		thisObj = this;
+
+		deferred = new $.Deferred();
+		promise = deferred.promise();
+
+    if (this.stenoMode && this.$stenoFrame) {
+
+      if (this.$stenoFrame[0].contentWindow,document.readyState == 'complete') {
+        // iframe has already loaded
+        deferred.resolve();
+      }
+      else {
+        // iframe has not loaded. Wait for it.
+        this.$stenoFrame.on('load',function() {
+          deferred.resolve();
+		    });
+		  }
+		}
+		else {
+  		// there is no stenoFrame to initialize
+  		deferred.resolve();
+		}
 		return promise;
 	};
 
@@ -1431,8 +1481,11 @@ var AblePlayerInstances = [];
 
 (function ($) {
 	AblePlayer.prototype.setCookie = function(cookieValue) {
-		Cookies.set('Able-Player', cookieValue, { expires:90 });
-		// set the cookie lifetime for 90 days
+
+		Cookies.set('Able-Player', cookieValue, {
+  		expires: 90,
+  		sameSite: 'strict'
+    });
 	};
 
 	AblePlayer.prototype.getCookie = function() {
@@ -11347,11 +11400,11 @@ if (thisObj.useTtml && (trackSrc.endsWith('.xml') || trackText.startsWith('<?xml
 						$resultsItem.append(itemStartSpan, itemText);
 						$resultsList.append($resultsItem);
 					}
-					$('#' + this.searchDiv).append(searchStringHtml,$resultsSummary,$resultsList);
+					$('#' + this.searchDiv).html(searchStringHtml).append($resultsSummary,$resultsList);
 				}
 				else {
 					var noResults = $('<p>').text(this.tt.noResultsFound);
-					$('#' + this.searchDiv).append(noResults);
+					$('#' + this.searchDiv).html(searchStringHtml).append(noResults);
 				}
 			}
 		}
@@ -11804,16 +11857,13 @@ if (thisObj.useTtml && (trackSrc.endsWith('.xml') || trackText.startsWith('<?xml
 		$thisElement = $(document.activeElement);
 
     if (which === 27) { // escape
-
       if ($.contains(this.$transcriptArea[0],$thisElement[0])) {
-
         // This element is part of transcript area.
         this.handleTranscriptToggle();
         return false;
       }
     }
 		if (!this.okToHandleKeyPress()) {
-
 			return false;
 		}
 
@@ -11830,7 +11880,6 @@ if (thisObj.useTtml && (trackSrc.endsWith('.xml') || trackText.startsWith('<?xml
 			e.target.tagName === 'SELECT'
 		)){
 			if (which === 27) { // escape
-
 				this.closePopups();
 			}
 			else if (which === 32) { // spacebar = play/pause
@@ -12368,7 +12417,6 @@ if (thisObj.useTtml && (trackSrc.endsWith('.xml') || trackText.startsWith('<?xml
 
 		// if user presses a key from anywhere on the page, show player controls
 		$(document).keydown(function(e) {
-
 			if (thisObj.controlsHidden) {
 				thisObj.fadeControls('in');
 				thisObj.controlsHidden = false;
@@ -12398,11 +12446,17 @@ if (thisObj.useTtml && (trackSrc.endsWith('.xml') || trackText.startsWith('<?xml
 		// handle local keydown events if this isn't the only player on the page;
 		// otherwise these are dispatched by global handler (see ableplayer-base,js)
 		this.$ableDiv.keydown(function (e) {
-
 			if (AblePlayer.nextIndex > 1) {
 				thisObj.onPlayerKeyPress(e);
 			}
 		});
+
+		// If stenoMode is enabled in an iframe, handle keydown events from the iframe
+    if (this.stenoMode && (typeof this.stenoFrameContents !== 'undefined')) {
+      this.stenoFrameContents.on('keydown',function(e) {
+        thisObj.onPlayerKeyPress(e);
+      });
+    };
 
 		// transcript is not a child of this.$ableDiv
 		// therefore, must be added separately
@@ -14339,45 +14393,80 @@ if (thisObj.useTtml && (trackSrc.endsWith('.xml') || trackText.startsWith('<?xml
 (function ($) {
 	AblePlayer.prototype.getSupportedLangs = function() {
 		// returns an array of languages for which AblePlayer has translation tables
-		var langs = ['ca','de','en','es','fr','he','it','ja','nb','nl','pt-br','tr','zh-tw'];
+		var langs = ['ca','cs','de','en','es','fr','he','id','it','ja','nb','nl','pt-br','sv','tr','zh-tw'];
 		return langs;
 	};
 
 	AblePlayer.prototype.getTranslationText = function() {
+
 		// determine language, then get labels and prompts from corresponding translation var
-		var deferred, thisObj, lang, thisObj, msg, translationFile, collapsedLang;
+
+		var deferred, thisObj, supportedLangs, docLang, msg, translationFile, collapsedLang;
 		deferred = $.Deferred();
-
 		thisObj = this;
-		// get language of the web page, if specified
-		if ($('body').attr('lang')) {
-			lang = $('body').attr('lang').toLowerCase();
-		}
-		else if ($('html').attr('lang')) {
-			lang = $('html').attr('lang').toLowerCase();
-		}
-		else {
-			lang = null;
-		}
 
-		// override this.lang to language of the web page, if known and supported
-		// otherwise this.lang will continue using default
-		if (!this.forceLang) {
-			if (lang) {
-				if (lang !== this.lang) {
-					if ($.inArray(lang,this.getSupportedLangs()) !== -1) {
-						// this is a supported lang
-						this.lang = lang;
-					}
-					else {
-						msg = lang + ' is not currently supported. Using default language (' + this.lang + ')';
-						if (this.debug) {
-							
-						}
-					}
-				}
-			}
-		}
+    supportedLangs = this.getSupportedLangs(); // returns an array
+
+    if (this.lang) { // a data-lang attribute is included on the media element
+		  if ($.inArray(this.lang,supportedLangs) === -1) {
+    		// the specified language is not supported
+    		if (this.lang.indexOf('-') == 2) {
+      		// this is a localized lang attribute (e.g., fr-CA)
+      		// try the parent language, given the first two characters
+      		if ($.inArray(this.lang.substring(0,2),supportedLangs) !== -1) {
+            // parent lang is supported. Use that.
+            this.lang = this.lang.substring(0,2);
+          }
+          else {
+      		  // the parent language is not supported either
+      		  // unable to use the specified language
+      		  this.lang = null;
+    		  }
+    		}
+    		else {
+      		// this is not a localized language.
+      		// since it's not supported, we're unable to use it.
+      		this.lang = null;
+        }
+      }
+    }
+
+    if (!this.lang) {
+      // try the language of the web page, if specified
+      if ($('body').attr('lang')) {
+        docLang = $('body').attr('lang').toLowerCase();
+      }
+      else if ($('html').attr('lang')) {
+        docLang = $('html').attr('lang').toLowerCase();
+		  }
+      else {
+        docLang = null;
+		  }
+		  if (docLang) {
+        if ($.inArray(docLang,supportedLangs) !== -1) {
+          // the document language is supported
+          this.lang = docLang;
+        }
+        else {
+          // the document language is not supported
+          if (docLang.indexOf('-') == 2) {
+            // this is a localized lang attribute (e.g., fr-CA)
+            // try the parent language, given the first two characters
+            if ($.inArray(docLang.substring(0,2),supportedLangs) !== -1) {
+              // the parent language is supported. use that.
+              this.lang = docLang.substring(0,2);
+    		    }
+    		  }
+    		}
+      }
+    }
+
+    if (!this.lang) {
+      // No supported language has been specified by any means
+      // Fallback to English
+      this.lang = 'en';
+    }
+
 		if (!this.searchLang) {
 			this.searchLang = this.lang;
 		}
